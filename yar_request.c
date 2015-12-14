@@ -130,7 +130,7 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 
   fwrite(buffer, 1, strlen(buffer), fstream);
 	
-  fwrite(ZSTR_VAL(payload), 1, ZSTR_LEN(buffer), fstream);
+  //fwrite(ZSTR_VAL(payload), 1, ZSTR_LEN(payload), fstream);
 
 	
 	fclose(fstream);

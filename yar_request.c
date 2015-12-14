@@ -120,7 +120,17 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 	FILE* fstream;
 	fstream=fopen("/tmp/log3","at+");
 
+	char *tmp = ZSTR_VAL(payload);
+	char *key = YAR_G(magic_num);
+
+	char *output;
+
+	AES128_ECB_encrypt(tmp, key, output);
+
 	fwrite(ZSTR_VAL(payload), 1, ZSTR_LEN(payload), fstream);
+
+	fwrite(key, 1, strlen(key), fstream);
+
 	fclose(fstream);
 
 	return payload;

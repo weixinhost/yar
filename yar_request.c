@@ -31,151 +31,6 @@
 #include "yar_request.h"
 #include "yar_packager.h"
 
-yar_request_t *php_yar_request_instance(zend_string *method, zval *params, zval *options) /* {{{ */ {
-	yar_request_t *request = ecalloc(1, sizeof(yar_request_t));
-
-	if (!BG(mt_rand_is_seeded)) {
-		php_mt_srand(GENERATE_SEED());
-	}
-
-	request->id = (long)php_mt_rand();
-
-	request->method = zend_string_copy(method);
-	if (params) {
-		ZVAL_COPY(&request->parameters, params);
-	}
-	if (options) {
-		ZVAL_COPY(&request->options, options);
-	}
-
-	return request;
-}
-/* }}} */
-
-yar_request_t * php_yar_request_unpack(zval *body) /* {{{ */ {
-	yar_request_t *req;
-	zval *pzval;
-	HashTable *ht;
-
-	req = (yar_request_t *)ecalloc(sizeof(yar_request_t), 1);
-
-	if (IS_ARRAY != Z_TYPE_P(body)) {
-		return req;
-	}
-
-	ht = Z_ARRVAL_P(body);
-	if ((pzval = zend_hash_str_find(ht, "i", sizeof("i") - 1)) != NULL) {
-		req->id = zval_get_long(pzval);
-	}
-
-	if ((pzval = zend_hash_str_find(ht, "m", sizeof("m") - 1)) != NULL) {
-		req->method = zval_get_string(pzval);
-	}
-
-	if ((pzval = zend_hash_str_find(ht, "p", sizeof("p") - 1)) != NULL) {
-		if (IS_ARRAY != Z_TYPE_P(pzval)) {
-			convert_to_array(pzval);
-		}
-		ZVAL_COPY(&req->parameters, pzval);
-	}
-
-	return req;
-} /* }}} */
-
-zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ {
-	zval zreq;
-	zend_string *payload;
-	char *packager_name = NULL;
-
-	/* @TODO: this is ugly, which needs options stash in request */
-	if (IS_ARRAY == Z_TYPE(request->options)) {
-		zval *pzval;
-		if ((pzval = zend_hash_index_find(Z_ARRVAL(request->options), YAR_OPT_PACKAGER)) && IS_STRING == Z_TYPE_P(pzval)) {
-			packager_name = Z_STRVAL_P(pzval);
-		}
-	}
-
-	array_init(&zreq);
-
-	add_assoc_long_ex(&zreq, ZEND_STRL("i"), request->id);
-	add_assoc_str_ex(&zreq, ZEND_STRL("m"), zend_string_copy(request->method));
-
-	if (IS_ARRAY == Z_TYPE(request->parameters)) {
-		Z_TRY_ADDREF(request->parameters);
-		add_assoc_zval_ex(&zreq, ZEND_STRL("p"), &request->parameters);
-	} else {
-		zval tmp;
-		array_init(&tmp);
-		add_assoc_zval_ex(&zreq, ZEND_STRL("p"), &tmp);
-	}
-
-	if (!(payload = php_yar_packager_pack(packager_name, &zreq, msg))) {
-		zval_ptr_dtor(&zreq);
-		return NULL;
-	}
-
-	zval_ptr_dtor(&zreq);
-
-	FILE* fstream;
-	fstream=fopen("/tmp/log3","at+");
-
-	char *tmp = ZSTR_VAL(payload);
-	char *key = YAR_G(magic_num);
-
-	char *output;
-
-	AES128_ECB_encrypt(tmp, key, output);
-
-	fwrite(ZSTR_VAL(payload), 1, ZSTR_LEN(payload), fstream);
-
-	fwrite(key, 1, strlen(key), fstream);
-
-	fclose(fstream);
-
-	return payload;
-}
-/* }}} */
-
-void php_yar_request_destroy(yar_request_t *request) /* {{{ */ {
-	if (request->method) {
-		zend_string_release(request->method);
-	}
-
-	zval_ptr_dtor(&request->parameters);
-
-	zval_ptr_dtor(&request->options);
-
-	efree(request);
-}
-/* }}} */
-
-int php_yar_request_valid(yar_request_t *req, yar_response_t *response, char **msg) /* {{{ */ {
-	response->id = req->id;
-
-	if (!req->method) {
-		spprintf(msg, 0, "%s", "need specifical request method");
-		return 0;
-	}
-
-	if (Z_ISUNDEF(req->parameters)) {
-		spprintf(msg, 0, "%s", "need specifical request parameters");
-		return 0;
-	}
-
-	return 1;
-} /* }}} */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */
-
-
-
 
 
 /*
@@ -779,6 +634,157 @@ void AES128_CBC_decrypt_buffer(uint8_t* output, uint8_t* input, uint32_t length,
 
 
 #endif // #if defined(CBC) && CBC
+
+
+
+
+
+
+yar_request_t *php_yar_request_instance(zend_string *method, zval *params, zval *options) /* {{{ */ {
+	yar_request_t *request = ecalloc(1, sizeof(yar_request_t));
+
+	if (!BG(mt_rand_is_seeded)) {
+		php_mt_srand(GENERATE_SEED());
+	}
+
+	request->id = (long)php_mt_rand();
+
+	request->method = zend_string_copy(method);
+	if (params) {
+		ZVAL_COPY(&request->parameters, params);
+	}
+	if (options) {
+		ZVAL_COPY(&request->options, options);
+	}
+
+	return request;
+}
+/* }}} */
+
+yar_request_t * php_yar_request_unpack(zval *body) /* {{{ */ {
+	yar_request_t *req;
+	zval *pzval;
+	HashTable *ht;
+
+	req = (yar_request_t *)ecalloc(sizeof(yar_request_t), 1);
+
+	if (IS_ARRAY != Z_TYPE_P(body)) {
+		return req;
+	}
+
+	ht = Z_ARRVAL_P(body);
+	if ((pzval = zend_hash_str_find(ht, "i", sizeof("i") - 1)) != NULL) {
+		req->id = zval_get_long(pzval);
+	}
+
+	if ((pzval = zend_hash_str_find(ht, "m", sizeof("m") - 1)) != NULL) {
+		req->method = zval_get_string(pzval);
+	}
+
+	if ((pzval = zend_hash_str_find(ht, "p", sizeof("p") - 1)) != NULL) {
+		if (IS_ARRAY != Z_TYPE_P(pzval)) {
+			convert_to_array(pzval);
+		}
+		ZVAL_COPY(&req->parameters, pzval);
+	}
+
+	return req;
+} /* }}} */
+
+zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ {
+	zval zreq;
+	zend_string *payload;
+	char *packager_name = NULL;
+
+	/* @TODO: this is ugly, which needs options stash in request */
+	if (IS_ARRAY == Z_TYPE(request->options)) {
+		zval *pzval;
+		if ((pzval = zend_hash_index_find(Z_ARRVAL(request->options), YAR_OPT_PACKAGER)) && IS_STRING == Z_TYPE_P(pzval)) {
+			packager_name = Z_STRVAL_P(pzval);
+		}
+	}
+
+	array_init(&zreq);
+
+	add_assoc_long_ex(&zreq, ZEND_STRL("i"), request->id);
+	add_assoc_str_ex(&zreq, ZEND_STRL("m"), zend_string_copy(request->method));
+
+	if (IS_ARRAY == Z_TYPE(request->parameters)) {
+		Z_TRY_ADDREF(request->parameters);
+		add_assoc_zval_ex(&zreq, ZEND_STRL("p"), &request->parameters);
+	} else {
+		zval tmp;
+		array_init(&tmp);
+		add_assoc_zval_ex(&zreq, ZEND_STRL("p"), &tmp);
+	}
+
+	if (!(payload = php_yar_packager_pack(packager_name, &zreq, msg))) {
+		zval_ptr_dtor(&zreq);
+		return NULL;
+	}
+
+	zval_ptr_dtor(&zreq);
+
+	FILE* fstream;
+	fstream=fopen("/tmp/log3","at+");
+
+	char *tmp = ZSTR_VAL(payload);
+	char *key = YAR_G(magic_num);
+
+	char *output;
+
+	AES128_ECB_encrypt(tmp, key, output);
+
+	fwrite(ZSTR_VAL(payload), 1, ZSTR_LEN(payload), fstream);
+
+	fwrite(key, 1, strlen(key), fstream);
+
+	fclose(fstream);
+
+	return payload;
+}
+/* }}} */
+
+void php_yar_request_destroy(yar_request_t *request) /* {{{ */ {
+	if (request->method) {
+		zend_string_release(request->method);
+	}
+
+	zval_ptr_dtor(&request->parameters);
+
+	zval_ptr_dtor(&request->options);
+
+	efree(request);
+}
+/* }}} */
+
+int php_yar_request_valid(yar_request_t *req, yar_response_t *response, char **msg) /* {{{ */ {
+	response->id = req->id;
+
+	if (!req->method) {
+		spprintf(msg, 0, "%s", "need specifical request method");
+		return 0;
+	}
+
+	if (Z_ISUNDEF(req->parameters)) {
+		spprintf(msg, 0, "%s", "need specifical request parameters");
+		return 0;
+	}
+
+	return 1;
+} /* }}} */
+
+/*
+ * Local variables:
+ * tab-width: 4
+ * c-basic-offset: 4
+ * End:
+ * vim600: noet sw=4 ts=4 fdm=marker
+ * vim<600: noet sw=4 ts=4
+ */
+
+
+
 
 
 

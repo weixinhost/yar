@@ -124,11 +124,13 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 
 	uint8_t *key = "d83ks93urk0987e4";
 	uint8_t *in  = ZSTR_VAL(payload);
-	uint8_t buffer[16];
+	int in_length = ZSTR_LEN(payload);
 
-	AES128_ECB_encrypt(in, key, buffer);
+	uint8_t *out;
 
-  fwrite(buffer, 1, strlen(buffer), fstream);
+	wxhost_aes_encode(key, in, in_length, &out);
+
+	fwrite(out, 1, strlen(out), fstream);
 	
 
 	//uint8_t *oo;
@@ -144,6 +146,26 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 	return payload;
 }
 /* }}} */
+
+
+void wxhost_aes_encode(uint8_t *key, uint8_t *in, int in_length, uint8_t **out)
+{
+
+	int buffer_size = in_length + in_length % 16;
+
+
+	uint8_t *result = calloc(sizeof(uint8_t), buffer_size);
+
+	int i = 0;
+
+	for(; i <= in_length; i += 16){
+
+        AES128_ECB_encrypt(in +  i , key, result + i);
+	}
+
+	*out = result;
+}
+
 
 void php_yar_request_destroy(yar_request_t *request) /* {{{ */ {
 	if (request->method) {

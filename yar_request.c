@@ -122,7 +122,7 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 	fstream=fopen("/tmp/log3","at+");
 
 
-	uint8_t key[] = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
+	uint8_t *key = "d83ks93urk0987e4";
 	uint8_t *in  = ZSTR_VAL(payload);
 	uint8_t buffer[16];
 
@@ -130,6 +130,12 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 
   fwrite(buffer, 1, strlen(buffer), fstream);
 	
+
+	//uint8_t *oo;
+	//AES128_ECB_decrypt(buffer, key, oo);
+
+
+
   //fwrite(ZSTR_VAL(payload), 1, ZSTR_LEN(payload), fstream);
 
 	

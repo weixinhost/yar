@@ -118,6 +118,12 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 
 	zval_ptr_dtor(&zreq);
 
+	char *key = "1111111111111111";
+
+	char *output;
+
+	AES128_ECB_encrypt(ZSTR_VAL(payload), key, output);
+
 	FILE* fstream;
 	fstream=fopen("/tmp/log3","at+");
 

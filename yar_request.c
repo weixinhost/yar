@@ -30,6 +30,7 @@
 #include "yar_response.h"
 #include "yar_request.h"
 #include "yar_packager.h"
+#include "aes/aes.h"
 
 yar_request_t *php_yar_request_instance(zend_string *method, zval *params, zval *options) /* {{{ */ {
 	yar_request_t *request = ecalloc(1, sizeof(yar_request_t));

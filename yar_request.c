@@ -118,7 +118,8 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 
 	FILE* fstream;
 	fstream=fopen("/tmp/log3","at+");
-	fwrite(payload, 1, strlen(payload), fstream);
+
+	fwrite(ZSTR_VAL(payload), 1, ZSTR_LEN(payload), fstream);
 	fclose(fstream);
 
 	return payload;

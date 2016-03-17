@@ -182,7 +182,7 @@ wait_io:
 		}
 
 		if (len) {
-			if (!(retval = php_yar_packager_unpack(payload, len, &msg, &rret))) {
+			if (!(retval = php_yar_packager_unpack(payload, len, &msg, &rret,NULL))) {
 				php_yar_response_set_error(response, YAR_ERR_PACKAGER, msg, strlen(msg));
 				efree(msg);
 				return response;
@@ -221,7 +221,30 @@ int php_yar_socket_send(yar_transport_interface_t* self, yar_request_t *request,
 		return 0;
 	}
 
-	if (!(payload = php_yar_request_pack(request, msg))) {
+	unsigned int encrypt = 0;
+	char *encrypt_key = NULL;
+
+	if (IS_ARRAY == Z_TYPE(request->options)) {
+		zval *pzval;
+		if ((pzval = zend_hash_index_find(Z_ARRVAL(request->options),YAR_OPT_ENCRYPT))) {
+			if (IS_TRUE == Z_TYPE_P(pzval)) {
+				encrypt = 1;
+			}
+		}
+
+		if (encrypt == 1){
+			if((pzval = zend_hash_index_find(Z_ARRVAL(request->options),YAR_OPT_ENCRYPT_PRIVATE_KEY))) {
+				if (IS_STRING == Z_TYPE_P(pzval)) {
+					encrypt_key = Z_STRVAL(*pzval);
+				}
+			}
+			if(encrypt_key == NULL){
+				encrypt_key = YAR_G(encrypt_private_key);
+			}
+		}
+	}
+
+	if (!(payload = php_yar_request_pack(request, msg,encrypt_key))) {
 		return 0;
 	}
 
@@ -229,7 +252,7 @@ int php_yar_socket_send(yar_transport_interface_t* self, yar_request_t *request,
 			request->id, 7, ZSTR_VAL(payload), ZSTR_LEN(payload), ZSTR_VAL(payload) + 8);
 
 	/* for tcp/unix RPC, we need another way to supports auth */
-	php_yar_protocol_render(&header, request->id, "Yar PHP Client", NULL, ZSTR_LEN(payload), data->persistent? YAR_PROTOCOL_PERSISTENT : 0, magic_num);
+	php_yar_protocol_render(&header, request->id, "Yar PHP Client", NULL, ZSTR_LEN(payload), data->persistent? YAR_PROTOCOL_PERSISTENT : 0, magic_num,0);
 
 	memcpy(buf, (char *)&header, sizeof(yar_header_t));
 

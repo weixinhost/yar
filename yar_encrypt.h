@@ -12,37 +12,25 @@
   | obtain it through the world-wide-web, please send a note to          |
   | license@php.net so we can mail you a copy immediately.               |
   +----------------------------------------------------------------------+
-  | Author:  Xinchen Hui   <laruence@php.net>                            |
-  |          Zhenyu  Zhang <zhangzhenyu@php.net>                         |
+  | Author:  Misko Lee   <imiskolee@gmail.com>                           |
+  |                                 |
   +----------------------------------------------------------------------+
 */
 
-/* $Id$ */
+#ifndef PHP_YAR_ENCRYPT_H
+#define PHP_YAR_ENCRYPT_H
 
-#ifndef PHP_YAR_REQUEST_H
-#define PHP_YAR_REQUEST_H
+#include "php.h"
 
-typedef struct _yar_request {
-	zend_ulong id;
-	zend_string *method;
-	zval parameters;
-	/* following fileds don't going to packager */
-	zval options;
-} yar_request_t;
+typedef struct {
+    unsigned int body_len;
+    unsigned int real_len;
+    unsigned char *body;
+} yar_encrypt_body_t;
 
-yar_request_t * php_yar_request_unpack(zval *body);
-void php_yar_request_destroy(yar_request_t *request);
-zend_string *php_yar_request_pack(yar_request_t *request, char **msg,char *encrypt_key);
-int php_yar_request_valid(yar_request_t *req, struct _yar_response *response, char **msg);
-yar_request_t * php_yar_request_instance(zend_string *method, zval *params, zval *options);
-
-#endif	/* PHP_YAR_REQUEST_H */
-
-/*
- * Local variables:
- * tab-width: 4
- * c-basic-offset: 4
- * End:
- * vim600: noet sw=4 ts=4 fdm=marker
- * vim<600: noet sw=4 ts=4
- */
+void get_encrypt_key(char *key,int key_len,unsigned char *store);
+yar_encrypt_body_t* yar_encrypt_body_encrypt(char *key,int key_len,char *body,int body_len);
+yar_encrypt_body_decrypt(char *key,char *key_len,char *body,int body_len,char *store);
+yar_encrypt_body_t* yar_encrypt_body_parse(char *body,int body_len);
+void yar_encrypt_body_render(yar_encrypt_body_t *encrypt,char *body,int body_len);
+#endif

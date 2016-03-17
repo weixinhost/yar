@@ -35,7 +35,8 @@ typedef struct _yar_header {
     unsigned short version;
     unsigned int   magic_num;
     unsigned int   reserved;
-    unsigned char  provider[32];
+    unsigned char  provider[28];
+    unsigned int   encrypt;
     unsigned char  token[32];
     unsigned int   body_len; 
 }
@@ -48,7 +49,7 @@ yar_header_t;
 #endif
 
 yar_header_t * php_yar_protocol_parse(char *payload, char *magic_num);
-void php_yar_protocol_render(yar_header_t *header, uint id, char *provider, char *token, uint body_len, uint reserved, char *magic_num);
+void php_yar_protocol_render(yar_header_t *header, uint id, char *provider, char *token, uint body_len, uint reserved, char *magic_num,uint encrypt);
 
 #endif	/* PHP_YAR_PROTOCOL_H */
 

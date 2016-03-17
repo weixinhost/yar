@@ -48,8 +48,8 @@ extern yar_packager_t yar_packager_json;
 extern yar_packager_t yar_packager_msgpack;
 #endif
 
-zend_string *php_yar_packager_pack(char *packager_name, zval *pzval, char **msg);
-zval *php_yar_packager_unpack(char *content, size_t len, char **msg, zval *rret);
+zend_string *php_yar_packager_pack(char *packager_name, zval *pzval, char **msg,char *encrypt_key);
+zval *php_yar_packager_unpack(char *content, size_t len, char **msg, zval *rret,char *encrypt_key);
 
 YAR_STARTUP_FUNCTION(packager);
 YAR_ACTIVATE_FUNCTION(packager);

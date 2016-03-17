@@ -353,12 +353,17 @@ yar_response_t *php_yar_curl_exec(yar_transport_interface_t* self, yar_request_t
 
 	php_yar_curl_prepare(self);
 
+	unsigned  int encrypt = 0;
+	char *encrypt_key = NULL;
+
 	if (IS_ARRAY == Z_TYPE(request->options)) {
 		zval *pzval;
 		if ((pzval = zend_hash_index_find(Z_ARRVAL(request->options), YAR_OPT_TIMEOUT))) {
 			convert_to_long_ex(pzval);
 			self->setopt(self, YAR_OPT_TIMEOUT, (long *)&Z_LVAL_P(pzval), NULL);
 		}
+
+
 	}
 
 	response = php_yar_response_instance();
@@ -397,11 +402,27 @@ yar_response_t *php_yar_curl_exec(yar_transport_interface_t* self, yar_request_t
 			return response;
 		}
 
+		if(header->encrypt == 1){
+
+			encrypt_key = YAR_G(encrypt_private_key);
+
+			if (IS_ARRAY == Z_TYPE(request->options)) {
+				zval *pzval;
+				if((pzval = zend_hash_index_find(Z_ARRVAL(request->options),YAR_OPT_ENCRYPT_PRIVATE_KEY))) {
+					if (IS_STRING != Z_TYPE_P(pzval)) {
+						encrypt_key = YAR_G(encrypt_private_key);
+					}else{
+						encrypt_key = Z_STRVAL(*pzval);
+					}
+				}
+			}
+		}
+
 		/* skip over the leading header */
 		payload += sizeof(yar_header_t);
 		payload_len -= sizeof(yar_header_t);
 
-		if (!(retval = php_yar_packager_unpack(payload, payload_len, &msg, &rret))) {
+		if (!(retval = php_yar_packager_unpack(payload, payload_len, &msg, &rret,encrypt_key))) {
 			php_yar_response_set_error(response, YAR_ERR_PACKAGER, msg, strlen(msg));
 			efree(msg);
 			return response;
@@ -424,15 +445,41 @@ int php_yar_curl_send(yar_transport_interface_t* self, yar_request_t *request, c
 	yar_header_t header = {0};
 	yar_curl_data_t *data = (yar_curl_data_t *)self->data;
 	zend_string *payload;
+	unsigned int encrypt = 0;
+	char *encrypt_key = NULL;
 
-	if (!(payload = php_yar_request_pack(request, msg))) {
+	if (IS_ARRAY == Z_TYPE(request->options)) {
+		zval *pzval;
+		if ((pzval = zend_hash_index_find(Z_ARRVAL(request->options),YAR_OPT_ENCRYPT))) {
+			if (IS_TRUE == Z_TYPE_P(pzval)) {
+				encrypt = 1;
+			}
+		}
+
+		if (encrypt == 1){
+			if((pzval = zend_hash_index_find(Z_ARRVAL(request->options),YAR_OPT_ENCRYPT_PRIVATE_KEY))) {
+				if (IS_STRING == Z_TYPE_P(pzval)) {
+					encrypt_key = Z_STRVAL(*pzval);
+				}
+			}
+			if(encrypt_key == NULL){
+				encrypt_key = YAR_G(encrypt_private_key);
+			}
+		}
+	}
+
+	if (!(payload = php_yar_request_pack(request, msg,encrypt_key))) {
 		return 0;
 	}
+
+
+
+
 
 	DEBUG_C(ZEND_ULONG_FMT": pack request by '%.*s', result len '%ld', content: '%.32s'", 
 			request->id, 7, ZSTR_VAL(payload), ZSTR_LEN(payload), ZSTR_VAL(payload) + 8);
 
-	php_yar_protocol_render(&header, request->id, data->host->user, data->host->pass, ZSTR_LEN(payload), 0, magic_num);
+	php_yar_protocol_render(&header, request->id, data->host->user, data->host->pass, ZSTR_LEN(payload), 0, magic_num,encrypt);
 
 	smart_str_appendl(&data->postfield, (char *)&header, sizeof(yar_header_t));
 	smart_str_appendl(&data->postfield, ZSTR_VAL(payload), ZSTR_LEN(payload));
@@ -509,7 +556,7 @@ int php_yar_curl_multi_add_handle(yar_transport_multi_interface_t *self, yar_tra
 	return 1;
 } /* }}} */
 
-static int php_yar_curl_multi_parse_response(yar_curl_multi_data_t *multi, yar_concurrent_client_callback *f, char *magic_num) /* {{{ */ {
+static int php_yar_curl_multi_parse_response(yar_curl_multi_data_t *multi, yar_concurrent_client_callback *f, char *magic_num,char *encrypt_key) /* {{{ */ {
 	int msg_in_sequence;
 	CURLMsg *msg;
 
@@ -580,15 +627,35 @@ static int php_yar_curl_multi_parse_response(yar_curl_multi_data_t *multi, yar_c
 							if (!(header = php_yar_protocol_parse(payload, magic_num))) {
 								php_yar_error(response, YAR_ERR_PROTOCOL, "malformed response header '%.32s'", payload);
 							} else {
-								/* skip over the leading header */
-								payload += sizeof(yar_header_t);
-								payload_len -= sizeof(yar_header_t);
-								if (!(retval = php_yar_packager_unpack(payload, payload_len, &msg, &rret))) {
-									php_yar_response_set_error(response, YAR_ERR_PACKAGER, msg, strlen(msg));
-								} else {
-									php_yar_response_map_retval(response, retval);
-									DEBUG_C(ZEND_ULONG_FMT": server response content packaged by '%.*s', len '%ld', content '%.32s'", response->id, 7, payload, header->body_len, payload + 8);
-									zval_ptr_dtor(retval);
+
+								char *temp_encrypt_key = NULL;
+
+								int verify = 1;
+
+								if(header->encrypt == 1){
+									if(encrypt_key == NULL){
+										verify = 0;
+										php_yar_error(response, YAR_ERR_PROTOCOL, "server is encrypt,please use encrypt mode");
+									}else{
+										temp_encrypt_key = encrypt_key;
+									}
+								}
+
+								if(verify == 1) {
+
+									/* skip over the leading header */
+									payload += sizeof(yar_header_t);
+									payload_len -= sizeof(yar_header_t);
+									if (!(retval = php_yar_packager_unpack(payload, payload_len, &msg, &rret,
+																		   temp_encrypt_key))) {
+										php_yar_response_set_error(response, YAR_ERR_PACKAGER, msg, strlen(msg));
+									} else {
+										php_yar_response_map_retval(response, retval);
+										DEBUG_C(ZEND_ULONG_FMT
+										": server response content packaged by '%.*s', len '%ld', content '%.32s'", response->id, 7, payload, header->body_len,
+												payload + 8);
+										zval_ptr_dtor(retval);
+									}
 								}
 								if (msg) {
 									efree(msg);
@@ -635,7 +702,7 @@ static int php_yar_curl_multi_parse_response(yar_curl_multi_data_t *multi, yar_c
 }
 /* }}} */
 
-int php_yar_curl_multi_exec(yar_transport_multi_interface_t *self, yar_concurrent_client_callback *f, char *magic_num) /* {{{ */ {
+int php_yar_curl_multi_exec(yar_transport_multi_interface_t *self, yar_concurrent_client_callback *f, char *magic_num,char *encrypt_key) /* {{{ */ {
 	int running_count, rest_count;
 	yar_curl_multi_data_t *multi;
 #ifdef ENABLE_EPOLL
@@ -752,7 +819,7 @@ int php_yar_curl_multi_exec(yar_transport_multi_interface_t *self, yar_concurren
 #endif
 
 			if (rest_count > running_count) {
-				int ret = php_yar_curl_multi_parse_response(multi, f, magic_num);
+				int ret = php_yar_curl_multi_parse_response(multi, f, magic_num,encrypt_key);
 				if (ret == -1) {
 					goto bailout;
 				} else if (ret == 0) {
@@ -762,7 +829,7 @@ int php_yar_curl_multi_exec(yar_transport_multi_interface_t *self, yar_concurren
 			}
 		} while (running_count);
 	} else {
-		int ret = php_yar_curl_multi_parse_response(multi, f, magic_num);
+		int ret = php_yar_curl_multi_parse_response(multi, f, magic_num,encrypt_key);
 		if (ret == -1) {
 			goto bailout;
 		} else if (ret == 0) {

@@ -58,6 +58,8 @@ PHP_INI_BEGIN()
 	STD_PHP_INI_ENTRY("yar.content_type", "application/octet-stream", PHP_INI_ALL, OnUpdateString, content_type, zend_yar_globals, yar_globals) 
     STD_PHP_INI_ENTRY("yar.allow_persistent",  "0", PHP_INI_ALL, OnUpdateBool, allow_persistent, zend_yar_globals, yar_globals)
 	STD_PHP_INI_ENTRY("yar.magic_num",  "0x80DFEC60", PHP_INI_ALL, OnUpdateString, magic_num, zend_yar_globals, yar_globals)
+	STD_PHP_INI_ENTRY("yar.encrypt",  "Off", PHP_INI_ALL, OnUpdateBool, encrypt,zend_yar_globals, yar_globals)
+	STD_PHP_INI_ENTRY("yar.encrypt_private_key",  "encrypt-yar", PHP_INI_ALL, OnUpdateString, encrypt_private_key, zend_yar_globals, yar_globals)
 PHP_INI_END()
 /* }}} */
 
@@ -96,7 +98,8 @@ PHP_MINIT_FUNCTION(yar)
 	REGISTER_LONG_CONSTANT("YAR_OPT_TIMEOUT", YAR_OPT_TIMEOUT, CONST_CS|CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("YAR_OPT_CONNECT_TIMEOUT", YAR_OPT_CONNECT_TIMEOUT, CONST_CS|CONST_PERSISTENT);
 	REGISTER_LONG_CONSTANT("YAR_OPT_MAGIC_NUM", YAR_OPT_MAGIC_NUM, CONST_CS|CONST_PERSISTENT);
-
+	REGISTER_LONG_CONSTANT("YAR_OPT_ENCRYPT", YAR_OPT_ENCRYPT, CONST_CS|CONST_PERSISTENT);
+	REGISTER_LONG_CONSTANT("YAR_OPT_ENCRYPT_PRIVATE_KEY", YAR_OPT_ENCRYPT_PRIVATE_KEY, CONST_CS|CONST_PERSISTENT);
 	
 	YAR_STARTUP(service);
 	YAR_STARTUP(client);

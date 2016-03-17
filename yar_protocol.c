@@ -33,12 +33,13 @@
 zend_class_entry *yar_client_ce;
 zend_class_entry *yar_concurrent_client_ce;
 
-void php_yar_protocol_render(yar_header_t *header, uint id, char *provider, char *token, uint body_len, uint reserved, char *magic_num) /* {{{ */ {
+void php_yar_protocol_render(yar_header_t *header, uint id, char *provider, char *token, uint body_len, uint reserved, char *magic_num,uint encrypt) /* {{{ */ {
 
 	header->magic_num = htonl(strtol(magic_num, NULL, 16));
 	header->id = htonl(id);
 	header->body_len = htonl(body_len);
 	header->reserved = htonl(reserved);
+	header->encrypt  = htonl(encrypt);
 	if (provider) {
 		memcpy(header->provider, provider, strlen(provider));
 	}
@@ -64,7 +65,7 @@ yar_header_t * php_yar_protocol_parse(char *payload, char *magic_num) /* {{{ */ 
 	header->id = ntohl(header->id);
 	header->body_len = ntohl(header->body_len);
 	header->reserved = ntohl(header->reserved);
-
+	header->encrypt  = ntohl(header->encrypt);
 	return header;
 } /* }}} */
 

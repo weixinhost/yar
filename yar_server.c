@@ -347,7 +347,12 @@ static void php_yar_server_response(yar_request_t *request, yar_response_t *resp
 		add_assoc_zval_ex(&ret, ZEND_STRL("e"), &response->err);
 	}
 
-    if (!(payload = php_yar_packager_pack(pkg_name, &ret, &err_msg))) {
+	char *encrypt_key = NULL;
+	if(1 == YAR_G(encrypt)) {
+		encrypt_key = YAR_G(encrypt_private_key);
+	}
+
+    if (!(payload = php_yar_packager_pack(pkg_name, &ret, &err_msg,encrypt_key))) {
 		zval_ptr_dtor(&ret);
 		php_yar_error(response, YAR_ERR_PACKAGER, "%s", err_msg);
 		efree(err_msg);
@@ -355,7 +360,7 @@ static void php_yar_server_response(yar_request_t *request, yar_response_t *resp
 	}
 	zval_ptr_dtor(&ret);
 
-	php_yar_protocol_render(&header, request? request->id : 0, "PHP Yar Server", NULL, ZSTR_LEN(payload), 0, YAR_G(magic_num));
+	php_yar_protocol_render(&header, request? request->id : 0, "PHP Yar Server", NULL, ZSTR_LEN(payload), 0, YAR_G(magic_num),YAR_G(encrypt));
 
 	DEBUG_S("%ld: server response: packager '%s', len '%ld', content '%.32s'",
 			request? request->id : 0, ZSTR_VAL(payload), ZSTR_LEN(payload) - 8, ZSTR_VAL(payload) + 8);
@@ -417,6 +422,18 @@ static void php_yar_server_handle(zval *obj) /* {{{ */ {
 		goto response_no_output;
 	}
 
+	if(header->encrypt == 1 ) {
+
+		if(YAR_G(encrypt) != 1) {
+			php_yar_error(response, YAR_ERR_PACKAGER, "server is not encrypt,must use encrypt server.'", payload);
+			goto response_no_output;
+		}
+	}
+
+	if (header->encrypt == 0 && YAR_G(encrypt) == 1){
+		php_yar_error(response, YAR_ERR_PACKAGER, "server is  encrypt,must need encrypt request.'", payload);
+		goto response_no_output;
+	}
 
 	DEBUG_S("%ld: accpect rpc request form '%s'",
 			header->id, header->provider? (char *)header->provider : "Yar PHP " PHP_YAR_VERSION);
@@ -424,7 +441,13 @@ static void php_yar_server_handle(zval *obj) /* {{{ */ {
 	payload += sizeof(yar_header_t);
 	payload_len -= sizeof(yar_header_t);
 
-	if (!(post_data = php_yar_packager_unpack(payload, payload_len, &err_msg, &rret))) {
+	char *encrypt_key = NULL;
+
+	if (YAR_G(encrypt) == 1){
+		encrypt_key = YAR_G(encrypt_private_key);
+	}
+
+	if (!(post_data = php_yar_packager_unpack(payload, payload_len, &err_msg, &rret,encrypt_key))) {
         php_yar_error(response, YAR_ERR_PACKAGER, err_msg);
 		efree(err_msg);
 		goto response_no_output;

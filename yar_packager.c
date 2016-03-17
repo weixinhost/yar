@@ -26,6 +26,7 @@
 #include "php.h"
 #include "php_yar.h"
 #include "yar_packager.h"
+#include "yar_encrypt.h"
 
 struct _yar_packagers_list {
 	unsigned int size;
@@ -58,7 +59,8 @@ PHP_YAR_API int php_yar_packager_register(yar_packager_t *packager) /* {{{ */ {
 	return yar_packagers_list.num++;
 } /* }}} */
 
-zend_string *php_yar_packager_pack(char *packager_name, zval *pzval, char **msg) /* {{{ */ {
+zend_string *php_yar_packager_pack(char *packager_name, zval *pzval, char **msg,char *encrypt_key) /* {{{ */ {
+
 	char header[8];
 	smart_str buf = {0};
 	yar_packager_t *packager = packager_name ?
@@ -68,10 +70,28 @@ zend_string *php_yar_packager_pack(char *packager_name, zval *pzval, char **msg)
 		php_error_docref(NULL, E_ERROR, "unsupported packager %s", packager_name);
 		return 0;
 	}
+
 	memcpy(header, packager->name, 8);
 	smart_str_alloc(&buf, YAR_PACKAGER_BUFFER_SIZE /* 1M */, 0);
 	smart_str_appendl(&buf, header, 8);
-    packager->pack(packager, pzval, &buf, msg); 
+
+	if(encrypt_key == NULL){
+		packager->pack(packager, pzval, &buf, msg);
+	}else{
+		
+		smart_str temp = {0};
+		packager->pack(packager, pzval, &temp, msg);
+		yar_encrypt_body_t *enc_body = yar_encrypt_body_encrypt(encrypt_key,strlen(encrypt_key),ZSTR_VAL(temp.s),ZSTR_LEN(temp.s));
+		unsigned  int body_len = enc_body->body_len;
+		enc_body->body_len = htonl(enc_body->body_len);
+		enc_body->real_len = htonl(enc_body->real_len);
+        smart_str_appendl(&buf, (void *)enc_body,8);
+        smart_str_appendl(&buf, enc_body->body, body_len);
+        smart_str_0(&temp);
+		efree(enc_body->body);
+        efree(enc_body);
+
+	}
 
 	if (buf.s) {
 		smart_str_0(&buf);
@@ -83,9 +103,10 @@ zend_string *php_yar_packager_pack(char *packager_name, zval *pzval, char **msg)
 	return NULL;
 } /* }}} */
 
-zval * php_yar_packager_unpack(char *content, size_t len, char **msg, zval *rret) /* {{{ */ {
+zval * php_yar_packager_unpack(char *content, size_t len, char **msg, zval *rret,char *encrypt_key) /* {{{ */ {
     char *pack_info = content; /* 4 bytes, last byte is version */
 	yar_packager_t *packager;
+
 
 	content = content + 8;
     len -= 8;
@@ -97,7 +118,19 @@ zval * php_yar_packager_unpack(char *content, size_t len, char **msg, zval *rret
 		return NULL;
 	}
 
-	return packager->unpack(packager, content, len, msg, rret);
+	if(encrypt_key == NULL){
+	   return packager->unpack(packager, content, len, msg, rret);
+	}else{
+        yar_encrypt_body_t *enc_body = (yar_encrypt_body_t *)content;
+		enc_body->body_len = ntohl(enc_body->body_len);
+		enc_body->real_len = ntohl(enc_body->real_len);
+		char *temp_content = content + 8;
+        char *store = emalloc(enc_body->body_len);
+        yar_encrypt_body_decrypt(encrypt_key,strlen(encrypt_key),temp_content,enc_body->body_len,store);
+        zval *ret = packager->unpack(packager, store, enc_body->real_len, msg, rret);
+		efree(store);
+		return ret;
+	}
 
 } /* }}} */
 

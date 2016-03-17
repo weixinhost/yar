@@ -59,6 +59,8 @@ ZEND_BEGIN_MODULE_GLOBALS(yar)
 	ulong timeout;
 	ulong connect_timeout;
 	char *magic_num;
+	zend_bool encrypt;
+	char *encrypt_private_key;
 ZEND_END_MODULE_GLOBALS(yar)
 
 #ifdef ZTS
@@ -93,6 +95,8 @@ extern ZEND_DECLARE_MODULE_GLOBALS(yar);
 #define YAR_OPT_TIMEOUT  			0x04
 #define YAR_OPT_CONNECT_TIMEOUT 	0x08
 #define YAR_OPT_MAGIC_NUM			0x10
+#define YAR_OPT_ENCRYPT 			0x12
+#define YAR_OPT_ENCRYPT_PRIVATE_KEY 0x14
 
 #define YAR_STASH_VARIABLES()  \
 		zend_bool _old_in_compilation, _old_in_execution, _old_display_errors; \

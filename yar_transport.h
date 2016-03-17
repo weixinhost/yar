@@ -56,7 +56,7 @@ typedef struct _yar_transport_interface {
 typedef struct _yar_transport_multi_interface {
     void *data;
 	int (*add)(struct _yar_transport_multi_interface *self, yar_transport_interface_t *cp);
-    int (*exec)(struct _yar_transport_multi_interface *self, yar_concurrent_client_callback *callback, char *magic_num);
+    int (*exec)(struct _yar_transport_multi_interface *self, yar_concurrent_client_callback *callback, char *magic_num,char *encrypt_key);
 	void (*close)(struct _yar_transport_multi_interface *self);
 } yar_transport_multi_interface_t;
 

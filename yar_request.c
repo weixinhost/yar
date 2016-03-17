@@ -82,11 +82,10 @@ yar_request_t * php_yar_request_unpack(zval *body) /* {{{ */ {
 	return req;
 } /* }}} */
 
-zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ {
+zend_string *php_yar_request_pack(yar_request_t *request, char **msg ,char *encrypt_key) /* {{{ */ {
 	zval zreq;
 	zend_string *payload;
 	char *packager_name = NULL;
-
 	/* @TODO: this is ugly, which needs options stash in request */
 	if (IS_ARRAY == Z_TYPE(request->options)) {
 		zval *pzval;
@@ -109,7 +108,7 @@ zend_string *php_yar_request_pack(yar_request_t *request, char **msg) /* {{{ */ 
 		add_assoc_zval_ex(&zreq, ZEND_STRL("p"), &tmp);
 	}
 
-	if (!(payload = php_yar_packager_pack(packager_name, &zreq, msg))) {
+	if (!(payload = php_yar_packager_pack(packager_name, &zreq, msg,encrypt_key))) {
 		zval_ptr_dtor(&zreq);
 		return NULL;
 	}
@@ -145,7 +144,7 @@ int php_yar_request_valid(yar_request_t *req, yar_response_t *response, char **m
 		spprintf(msg, 0, "%s", "need specifical request parameters");
 		return 0;
 	}
-
+	
 	return 1;
 } /* }}} */
 

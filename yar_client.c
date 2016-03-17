@@ -184,7 +184,20 @@ static int php_yar_client_set_opt(zval *client, long type, zval *value) /* {{{ *
 				}
 			}
 		}
+
+		case YAR_OPT_ENCRYPT_PRIVATE_KEY:
+		{
+			if (!verified) {
+				verified = 1;
+				if (IS_STRING != Z_TYPE_P(value)) {
+					php_error_docref(NULL, E_WARNING, "expects a string encrypt_private_key");
+					return 0;
+				}
+			}
+		}
+
 		case YAR_OPT_PERSISTENT:
+		case YAR_OPT_ENCRYPT:
 		{
 			if (!verified) {
 				verified = 1;
@@ -195,6 +208,7 @@ static int php_yar_client_set_opt(zval *client, long type, zval *value) /* {{{ *
 
 			}
 		}
+
 		case YAR_OPT_TIMEOUT:
 		case YAR_OPT_CONNECT_TIMEOUT:
 		{
@@ -432,6 +446,7 @@ int php_yar_concurrent_client_handle(zval *callstack) /* {{{ */ {
 	yar_transport_t *factory;
 	yar_transport_interface_t *transport;
 	yar_transport_multi_interface_t *multi;
+	char *encrypt_key = NULL;
 
 	char *magic_num_tmp = YAR_G(magic_num);
 
@@ -490,6 +505,18 @@ int php_yar_concurrent_client_handle(zval *callstack) /* {{{ */ {
 			}
 		}
 
+		if (!Z_ISUNDEF(entry->options)) {
+			zval *val = php_yar_client_get_opt(&entry->options, YAR_OPT_ENCRYPT);
+			if (IS_TRUE == Z_TYPE_P(val)) {
+				zval *val = php_yar_client_get_opt(&entry->options, YAR_OPT_ENCRYPT_PRIVATE_KEY);
+				if (val && Z_TYPE_P(val) == IS_STRING) {
+					encrypt_key = Z_STRVAL(*val);
+				}else{
+					encrypt_key = YAR_G(encrypt_private_key);
+				}
+			}
+		}
+
 		if (!transport->send(transport, request, &msg, magic_num_tmp)) {
 			php_yar_client_trigger_error(1, YAR_ERR_TRANSPORT, msg);
 			transport->close(transport);
@@ -503,7 +530,7 @@ int php_yar_concurrent_client_handle(zval *callstack) /* {{{ */ {
 		php_yar_request_destroy(request);
 	} ZEND_HASH_FOREACH_END();
 
-	if (!multi->exec(multi, php_yar_concurrent_client_callback, magic_num_tmp)) {
+	if (!multi->exec(multi, php_yar_concurrent_client_callback, magic_num_tmp,encrypt_key)) {
 		multi->close(multi);
 		return 0;
 	}
